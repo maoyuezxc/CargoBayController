@@ -17,7 +17,8 @@ enum LID_STATUS {
     LID_STATUS_CLOSING,
     LID_STATUS_CLOSED,
     LID_STATUS_FAULT,
-    LID_STATUS_READY
+    LID_STATUS_READY,
+    LID_STATUS_TIGHTING
 };
 
 void DoorControlFunction(void);

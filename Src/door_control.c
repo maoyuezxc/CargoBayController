@@ -1,9 +1,10 @@
 #include "main.h"
+#include "can.h"
 #include "motor.h"
+#include <string.h>
 #include "detector.h"
 #include "door_control.h"
-#include "can.h"
-#include <string.h>
+#include "OverCurrentProtection.h"
 
 /* ------------------ Speed parameters ----------------------------------*/
 #define ANGULAR_SPEED 0.27f
@@ -13,7 +14,7 @@
 #define ANGULAR_DEAD_ZONE 0.02f
 #define OPEN_ANGLE (PI * 90.0f / 180.0f)    // 95 degrees，90 degree - wolf on 2022.07.11
 #define CLOSE_ANGLE (PI * -100.0f / 180.0f) // -105 degrees, 100 degree - wolf on 2022.07.11
-const float TIGHT_ANGLE[DOOR_QUANTITY] = {PI * -12.0f / 180.0f, PI * -12.0f / 180.0f};
+const float TIGHT_ANGLE[DOOR_QUANTITY] = {PI * -6.0f / 180.0f, PI * -6.0f / 180.0f};
 // original value: {PI * -12.0f / 180.0f, PI * -16.0f / 180.0f};
 
 #define REPORT_STATUS_TIME 200
@@ -59,7 +60,8 @@ void DoorOpen(uint16_t doorNo)
     {
         doorState[doorNo] = LID_STATUS_OPENING;
         goalAngle[doorNo] = OPEN_ANGLE;
-        SetAngularSpeed(doorNo, ANGULAR_SPEED);
+				ClearOverCurrentStatus(doorNo);  
+				SetAngularSpeed(doorNo, ANGULAR_SPEED);
     }
 }
 
@@ -74,14 +76,19 @@ void DoorClose(uint16_t doorNo)
     {
         doorState[doorNo] = LID_STATUS_CLOSING;
         goalAngle[doorNo] = CLOSE_ANGLE;
-        SetAngularSpeed(doorNo, -ANGULAR_SPEED);
+				ClearOverCurrentStatus(doorNo);  
+				SetAngularSpeed(doorNo, -ANGULAR_SPEED);
+				
     }
 }
 
 void DoorReset(uint16_t doorNo)
 {
     if (LID_STATUS_FAULT == doorState[doorNo])
-        doorState[doorNo] = LID_STATUS_READY;
+		{
+			doorState[doorNo] = LID_STATUS_READY;
+			ClearOverCurrentStatus(doorNo);
+		}
 }
 
 uint16_t ll(uint16_t DoorNo)
@@ -119,9 +126,31 @@ void DoorControlFunction(void)
                 ClearEncoderAndAngle(i);
                 goalAngle[i] = TIGHT_ANGLE[i];
                 SetAngularSpeed(i, -ANGULAR_SPEED); //-ANGULAR_SPEED
+                //doorState[i] = LID_STATUS_CLOSED;
+                doorState[i] = LID_STATUS_TIGHTING;
+            }
+            else if (GetOverCurrentStatus(i)) doorState[i] = LID_STATUS_FAULT;
+            break;
+
+        case LID_STATUS_TIGHTING:
+            if (GetOverCurrentStatus(i) || GetMotorPosition(i) <= TIGHT_ANGLE[i])
+            {
+                SetAngularSpeedToZero(i);
                 doorState[i] = LID_STATUS_CLOSED;
+                ClearOverCurrentStatus(i);
             }
             break;
+
+        case LID_STATUS_OPENING:
+            if (GetOverCurrentStatus(i)) doorState[i] = LID_STATUS_FAULT;
+						if (GetMotorPosition(i) >= OPEN_ANGLE)
+						{
+							SetAngularSpeedToZero(i);
+							doorState[i] = LID_STATUS_OPENED;
+				
+						}
+						
+						break;
 
         case LID_STATUS_FAULT:
             SetAngularSpeedToZero(i);
@@ -131,14 +160,15 @@ void DoorControlFunction(void)
             break;
         }
 
-        float diffAngle = goalAngle[i] - GetMotorPosition(i);
-        if (diffAngle < ANGULAR_DEAD_ZONE && diffAngle > -ANGULAR_DEAD_ZONE)
-        {
-            // SetAngularSpeed(i, 0);
-            SetAngularSpeedToZero(i);
-            if (LID_STATUS_OPENING == doorState[i])
-                doorState[i] = LID_STATUS_OPENED;
-        }
+//        float diffAngle = goalAngle[i] - GetMotorPosition(i);
+//        if (diffAngle < ANGULAR_DEAD_ZONE && diffAngle > -ANGULAR_DEAD_ZONE)
+//        {
+//            // SetAngularSpeed(i, 0);
+//            SetAngularSpeedToZero(i);
+//            if (LID_STATUS_OPENING == doorState[i])
+//                doorState[i] = LID_STATUS_OPENED;
+//						
+//        }
     }
 
     uint32_t timeInterval = HAL_GetTick() - lastTick;
@@ -151,7 +181,7 @@ void DoorControlFunction(void)
 
 /**
  * @brief Inform the door control module command received.
- * Provide an interface for CAN module to infrom the door control module
+ * Provide an interface for CAN module to inform the door control module
  * when there're new commands received. The function will analysis the
  * message and control the lid as the command.
  * @param lidId 1 - Front lid 2 - Rear Lid
