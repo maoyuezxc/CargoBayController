@@ -60,8 +60,8 @@ void DoorOpen(uint16_t doorNo)
     {
         doorState[doorNo] = LID_STATUS_OPENING;
         goalAngle[doorNo] = OPEN_ANGLE;
-				ClearOverCurrentStatus(doorNo);  
-				SetAngularSpeed(doorNo, ANGULAR_SPEED);
+        ClearOverCurrentStatus(doorNo);
+        SetAngularSpeed(doorNo, ANGULAR_SPEED);
     }
 }
 
@@ -76,19 +76,18 @@ void DoorClose(uint16_t doorNo)
     {
         doorState[doorNo] = LID_STATUS_CLOSING;
         goalAngle[doorNo] = CLOSE_ANGLE;
-				ClearOverCurrentStatus(doorNo);  
-				SetAngularSpeed(doorNo, -ANGULAR_SPEED);
-				
+        ClearOverCurrentStatus(doorNo);
+        SetAngularSpeed(doorNo, -ANGULAR_SPEED);
     }
 }
 
 void DoorReset(uint16_t doorNo)
 {
     if (LID_STATUS_FAULT == doorState[doorNo])
-		{
-			doorState[doorNo] = LID_STATUS_READY;
-			ClearOverCurrentStatus(doorNo);
-		}
+    {
+        doorState[doorNo] = LID_STATUS_READY;
+        ClearOverCurrentStatus(doorNo);
+    }
 }
 
 uint16_t ll(uint16_t DoorNo)
@@ -126,10 +125,11 @@ void DoorControlFunction(void)
                 ClearEncoderAndAngle(i);
                 goalAngle[i] = TIGHT_ANGLE[i];
                 SetAngularSpeed(i, -ANGULAR_SPEED); //-ANGULAR_SPEED
-                //doorState[i] = LID_STATUS_CLOSED;
+                // doorState[i] = LID_STATUS_CLOSED;
                 doorState[i] = LID_STATUS_TIGHTING;
             }
-            else if (GetOverCurrentStatus(i)) doorState[i] = LID_STATUS_FAULT;
+            else if (GetOverCurrentStatus(i))
+                doorState[i] = LID_STATUS_FAULT;
             break;
 
         case LID_STATUS_TIGHTING:
@@ -142,15 +142,15 @@ void DoorControlFunction(void)
             break;
 
         case LID_STATUS_OPENING:
-            if (GetOverCurrentStatus(i)) doorState[i] = LID_STATUS_FAULT;
-						if (GetMotorPosition(i) >= OPEN_ANGLE)
-						{
-							SetAngularSpeedToZero(i);
-							doorState[i] = LID_STATUS_OPENED;
-				
-						}
-						
-						break;
+            if (GetOverCurrentStatus(i))
+                doorState[i] = LID_STATUS_FAULT;
+            if (GetMotorPosition(i) >= OPEN_ANGLE)
+            {
+                SetAngularSpeedToZero(i);
+                doorState[i] = LID_STATUS_OPENED;
+            }
+
+            break;
 
         case LID_STATUS_FAULT:
             SetAngularSpeedToZero(i);
@@ -159,16 +159,6 @@ void DoorControlFunction(void)
         default:
             break;
         }
-
-//        float diffAngle = goalAngle[i] - GetMotorPosition(i);
-//        if (diffAngle < ANGULAR_DEAD_ZONE && diffAngle > -ANGULAR_DEAD_ZONE)
-//        {
-//            // SetAngularSpeed(i, 0);
-//            SetAngularSpeedToZero(i);
-//            if (LID_STATUS_OPENING == doorState[i])
-//                doorState[i] = LID_STATUS_OPENED;
-//						
-//        }
     }
 
     uint32_t timeInterval = HAL_GetTick() - lastTick;
